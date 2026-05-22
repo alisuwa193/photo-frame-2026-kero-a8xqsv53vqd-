@@ -57,8 +57,13 @@
       object-fit: cover;
     }
 
-    /* 撮影中の表示だけ左右反転 */
-    #video {
+    /*
+      撮影中の画面だけ左右反転します。
+      カメラ映像とフレームの両方を鏡のように表示します。
+      保存時にはこのCSS反転は反映されません。
+    */
+    #video,
+    #frameCanvas {
       transform: scaleX(-1);
     }
 
@@ -220,7 +225,10 @@
 
       if (!imageLoaded) return;
 
-      // フレーム画像は反転せず、そのまま重ねる
+      /*
+        Canvas内部には通常向きで描画します。
+        表示上だけCSSで左右反転されます。
+      */
       ctx.drawImage(frameImage, 0, 0, w, h);
     }
 
@@ -233,12 +241,17 @@
 
       const outputCtx = outputCanvas.getContext("2d");
 
-      // 保存時は左右反転させない
-      // CSSの transform は画面表示だけに効くため、
-      // drawImage では元のカメラ映像がそのまま描画される
+      /*
+        保存時は左右反転させません。
+        CSSの transform は画面表示だけに効くため、
+        drawImage では元のカメラ映像がそのまま描画されます。
+      */
       outputCtx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
 
-      // フレーム画像も反転せず、そのまま重ねる
+      /*
+        フレームも保存時は反転させません。
+        frameCanvas内部には通常向きで描かれているため、そのまま保存されます。
+      */
       outputCtx.drawImage(frameCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
 
       outputCanvas.toBlob((blob) => {
