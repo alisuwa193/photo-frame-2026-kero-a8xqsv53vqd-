@@ -17,21 +17,23 @@
       background: #101510;
       color: white;
       text-align: center;
+      overflow-x: hidden;
+      padding-bottom: 150px; /* 固定ボタンに隠れないための余白 */
     }
 
     header {
-      padding: 16px 12px 8px;
+      padding: 8px 12px 6px;
     }
 
     h1 {
-      margin: 8px 0;
-      font-size: 24px;
+      margin: 4px 0;
+      font-size: 20px;
     }
 
     p {
-      margin: 6px 0;
+      margin: 4px 0;
       color: #ddd;
-      font-size: 14px;
+      font-size: 13px;
     }
 
     .camera-area {
@@ -42,7 +44,7 @@
       aspect-ratio: 9 / 16;
       background: black;
       overflow: hidden;
-      border-radius: 18px;
+      border-radius: 16px;
       box-shadow: 0 0 24px rgba(120, 220, 120, 0.35);
     }
 
@@ -59,10 +61,21 @@
       pointer-events: none;
     }
 
-    .controls {
+    .fixed-controls {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 100;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      background: rgba(16, 21, 16, 0.92);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.35);
+    }
+
+    .button-area {
       max-width: 430px;
-      margin: 16px auto;
-      padding: 0 16px;
+      margin: 0 auto;
       display: grid;
       gap: 10px;
     }
@@ -93,16 +106,22 @@
       display: none;
       width: 92%;
       max-width: 430px;
-      margin: 16px auto;
-      border-radius: 18px;
+      margin: 14px auto;
+      border-radius: 16px;
       box-shadow: 0 0 20px rgba(255,255,255,0.2);
     }
 
     .notice {
-      padding: 0 20px 24px;
+      padding: 10px 20px 24px;
       font-size: 12px;
       color: #aaa;
       line-height: 1.6;
+    }
+
+    .status {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #bbb;
     }
   </style>
 </head>
@@ -119,19 +138,21 @@
       <canvas id="frameCanvas"></canvas>
     </div>
 
-    <div class="controls">
-      <button onclick="takePhoto()">撮影する</button>
-      <button id="shareButton" class="secondary" onclick="sharePhoto()">写真を共有・保存する</button>
-    </div>
-
     <img id="photoResult" alt="撮影結果" />
 
     <p class="notice">
       撮影画像はサーバーに送信されません。スマホ内・ブラウザ内で処理されます。<br>
-      撮影後、「写真を共有・保存する」を押して、共有メニューから「画像を保存」または「写真に保存」を選んでください。<br>
-      うまくいかない場合は、表示された撮影結果を長押しして保存してください。
+      保存できない場合は、表示された撮影結果を長押しして保存してください。
     </p>
   </main>
+
+  <div class="fixed-controls">
+    <div class="button-area">
+      <button onclick="takePhoto()">撮影する</button>
+      <button id="shareButton" class="secondary" onclick="sharePhoto()">写真を共有・保存する</button>
+      <div class="status" id="statusText">撮影ボタンはここに固定されています</div>
+    </div>
+  </div>
 
   <script>
     const video = document.getElementById("video");
@@ -139,6 +160,7 @@
     const ctx = frameCanvas.getContext("2d");
     const photoResult = document.getElementById("photoResult");
     const shareButton = document.getElementById("shareButton");
+    const statusText = document.getElementById("statusText");
 
     const frameImage = new Image();
     frameImage.src = "suwako.png";
@@ -150,9 +172,11 @@
     frameImage.onload = () => {
       imageLoaded = true;
       drawFrame();
+      statusText.textContent = "フレーム画像を読み込みました";
     };
 
     frameImage.onerror = () => {
+      statusText.textContent = "suwako.png を読み込めませんでした";
       alert("フレーム画像を読み込めませんでした。suwako.png を index.html と同じフォルダに置いてください。");
     };
 
@@ -166,7 +190,9 @@
         });
 
         video.srcObject = stream;
+        statusText.textContent = "カメラを起動しました";
       } catch (error) {
+        statusText.textContent = "カメラを起動できませんでした";
         alert("カメラを起動できませんでした。ブラウザのカメラ許可を確認してください。");
         console.error(error);
       }
@@ -189,6 +215,7 @@
 
       if (!imageLoaded) return;
 
+      // 透過PNGだけをカメラ映像に重ねる
       ctx.drawImage(frameImage, 0, 0, w, h);
     }
 
@@ -217,9 +244,16 @@
         }
 
         latestImageUrl = URL.createObjectURL(blob);
+
         photoResult.src = latestImageUrl;
         photoResult.style.display = "block";
         shareButton.style.display = "block";
+        statusText.textContent = "撮影しました。保存する場合は共有ボタンを押してください。";
+
+        photoResult.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
       }, "image/png");
     }
 
