@@ -4,11 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <!-- 検索避け：検索結果に表示しないよう検索エンジンへ指示 -->
+  <!-- 検索避け -->
   <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
   <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
 
-  <title>諏訪子様フォトフレーム</title>
+  <title>幻想フォトフレーム</title>
 
   <style>
     body {
@@ -63,6 +63,8 @@
       max-width: 430px;
       margin: 16px auto;
       padding: 0 16px;
+      display: grid;
+      gap: 10px;
     }
 
     button {
@@ -75,6 +77,12 @@
       font-size: 17px;
       font-weight: bold;
       cursor: pointer;
+    }
+
+    button.secondary {
+      display: none;
+      background: #ffffff;
+      color: #102010;
     }
 
     button:active {
@@ -113,13 +121,15 @@
 
     <div class="controls">
       <button onclick="takePhoto()">撮影する</button>
+      <button id="shareButton" class="secondary" onclick="sharePhoto()">写真を共有・保存する</button>
     </div>
 
     <img id="photoResult" alt="撮影結果" />
 
     <p class="notice">
       撮影画像はサーバーに送信されません。スマホ内・ブラウザ内で処理されます。<br>
-      保存できない場合は、表示された撮影結果を長押しして保存してください。
+      撮影後、「写真を共有・保存する」を押して、共有メニューから「画像を保存」または「写真に保存」を選んでください。<br>
+      うまくいかない場合は、表示された撮影結果を長押しして保存してください。
     </p>
   </main>
 
@@ -128,11 +138,14 @@
     const frameCanvas = document.getElementById("frameCanvas");
     const ctx = frameCanvas.getContext("2d");
     const photoResult = document.getElementById("photoResult");
+    const shareButton = document.getElementById("shareButton");
 
     const frameImage = new Image();
     frameImage.src = "suwako.png";
 
     let imageLoaded = false;
+    let latestImageBlob = null;
+    let latestImageUrl = null;
 
     frameImage.onload = () => {
       imageLoaded = true;
@@ -176,7 +189,6 @@
 
       if (!imageLoaded) return;
 
-      // 透過PNGだけをカメラ映像に重ねる
       ctx.drawImage(frameImage, 0, 0, w, h);
     }
 
@@ -189,21 +201,53 @@
 
       const outputCtx = outputCanvas.getContext("2d");
 
-      // カメラ映像
       outputCtx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
-
-      // 透過PNGフレーム
       outputCtx.drawImage(frameCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
 
-      const imageData = outputCanvas.toDataURL("image/png");
+      outputCanvas.toBlob((blob) => {
+        if (!blob) {
+          alert("画像の作成に失敗しました。");
+          return;
+        }
 
-      photoResult.src = imageData;
-      photoResult.style.display = "block";
+        latestImageBlob = blob;
 
-      const link = document.createElement("a");
-      link.href = imageData;
-      link.download = "photo-frame.png";
-      link.click();
+        if (latestImageUrl) {
+          URL.revokeObjectURL(latestImageUrl);
+        }
+
+        latestImageUrl = URL.createObjectURL(blob);
+        photoResult.src = latestImageUrl;
+        photoResult.style.display = "block";
+        shareButton.style.display = "block";
+      }, "image/png");
+    }
+
+    async function sharePhoto() {
+      if (!latestImageBlob) {
+        alert("先に撮影してください。");
+        return;
+      }
+
+      const file = new File(
+        [latestImageBlob],
+        "photo-frame.png",
+        { type: "image/png" }
+      );
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: "幻想フォトフレーム",
+            text: "撮影した写真です"
+          });
+        } catch (error) {
+          console.log("共有がキャンセルされたか、失敗しました。", error);
+        }
+      } else {
+        alert("このブラウザでは共有保存に対応していません。表示された画像を長押しして保存してください。");
+      }
     }
 
     window.addEventListener("resize", resizeCanvas);
