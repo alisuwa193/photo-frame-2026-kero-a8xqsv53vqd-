@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- 検索避け：検索結果に表示しないよう検索エンジンへ指示 -->
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+  <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+
+  <title>諏訪子様フォトフレーム</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #101510;
+      color: white;
+      text-align: center;
+    }
+
+    header {
+      padding: 16px 12px 8px;
+    }
+
+    h1 {
+      margin: 8px 0;
+      font-size: 24px;
+    }
+
+    p {
+      margin: 6px 0;
+      color: #ddd;
+      font-size: 14px;
+    }
+
+    .camera-area {
+      position: relative;
+      width: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      aspect-ratio: 9 / 16;
+      background: black;
+      overflow: hidden;
+      border-radius: 18px;
+      box-shadow: 0 0 24px rgba(120, 220, 120, 0.35);
+    }
+
+    video,
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #frameCanvas {
+      pointer-events: none;
+    }
+
+    .controls {
+      max-width: 430px;
+      margin: 16px auto;
+      padding: 0 16px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 999px;
+      background: #78d66b;
+      color: #102010;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    #photoResult {
+      display: none;
+      width: 92%;
+      max-width: 430px;
+      margin: 16px auto;
+      border-radius: 18px;
+      box-shadow: 0 0 20px rgba(255,255,255,0.2);
+    }
+
+    .notice {
+      padding: 0 20px 24px;
+      font-size: 12px;
+      color: #aaa;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>幻想フォトフレーム</h1>
+    <p>カメラの使用を許可して撮影してください</p>
+  </header>
+
+  <main>
+    <div class="camera-area">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="frameCanvas"></canvas>
+    </div>
+
+    <div class="controls">
+      <button onclick="takePhoto()">撮影する</button>
+    </div>
+
+    <img id="photoResult" alt="撮影結果" />
+
+    <p class="notice">
+      撮影画像はサーバーに送信されません。スマホ内・ブラウザ内で処理されます。<br>
+      保存できない場合は、表示された撮影結果を長押しして保存してください。
+    </p>
+  </main>
+
+  <script>
+    const video = document.getElementById("video");
+    const frameCanvas = document.getElementById("frameCanvas");
+    const ctx = frameCanvas.getContext("2d");
+    const photoResult = document.getElementById("photoResult");
+
+    const frameImage = new Image();
+    frameImage.src = "suwako.png";
+
+    let imageLoaded = false;
+
+    frameImage.onload = () => {
+      imageLoaded = true;
+      drawFrame();
+    };
+
+    frameImage.onerror = () => {
+      alert("フレーム画像を読み込めませんでした。suwako.png を index.html と同じフォルダに置いてください。");
+    };
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user"
+          },
+          audio: false
+        });
+
+        video.srcObject = stream;
+      } catch (error) {
+        alert("カメラを起動できませんでした。ブラウザのカメラ許可を確認してください。");
+        console.error(error);
+      }
+    }
+
+    function resizeCanvas() {
+      const rect = frameCanvas.getBoundingClientRect();
+
+      frameCanvas.width = rect.width;
+      frameCanvas.height = rect.height;
+
+      drawFrame();
+    }
+
+    function drawFrame() {
+      const w = frameCanvas.width;
+      const h = frameCanvas.height;
+
+      ctx.clearRect(0, 0, w, h);
+
+      if (!imageLoaded) return;
+
+      // 透過PNGだけをカメラ映像に重ねる
+      ctx.drawImage(frameImage, 0, 0, w, h);
+    }
+
+    function takePhoto() {
+      const outputCanvas = document.createElement("canvas");
+      const rect = frameCanvas.getBoundingClientRect();
+
+      outputCanvas.width = rect.width;
+      outputCanvas.height = rect.height;
+
+      const outputCtx = outputCanvas.getContext("2d");
+
+      // カメラ映像
+      outputCtx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
+
+      // 透過PNGフレーム
+      outputCtx.drawImage(frameCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
+
+      const imageData = outputCanvas.toDataURL("image/png");
+
+      photoResult.src = imageData;
+      photoResult.style.display = "block";
+
+      const link = document.createElement("a");
+      link.href = imageData;
+      link.download = "photo-frame.png";
+      link.click();
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+
+    startCamera();
+
+    setTimeout(() => {
+      resizeCanvas();
+    }, 500);
+  </script>
+</body>
+</html>
