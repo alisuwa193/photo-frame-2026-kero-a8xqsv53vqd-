@@ -18,7 +18,7 @@
       color: white;
       text-align: center;
       overflow-x: hidden;
-      padding-bottom: 150px; /* 固定ボタンに隠れないための余白 */
+      padding-bottom: 150px;
     }
 
     header {
@@ -55,6 +55,11 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
+    }
+
+    /* 撮影中の表示だけ左右反転 */
+    #video {
+      transform: scaleX(-1);
     }
 
     #frameCanvas {
@@ -215,7 +220,7 @@
 
       if (!imageLoaded) return;
 
-      // 透過PNGだけをカメラ映像に重ねる
+      // フレーム画像は反転せず、そのまま重ねる
       ctx.drawImage(frameImage, 0, 0, w, h);
     }
 
@@ -228,7 +233,12 @@
 
       const outputCtx = outputCanvas.getContext("2d");
 
+      // 保存時は左右反転させない
+      // CSSの transform は画面表示だけに効くため、
+      // drawImage では元のカメラ映像がそのまま描画される
       outputCtx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
+
+      // フレーム画像も反転せず、そのまま重ねる
       outputCtx.drawImage(frameCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
 
       outputCanvas.toBlob((blob) => {
