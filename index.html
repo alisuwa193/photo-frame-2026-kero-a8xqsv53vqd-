@@ -11,6 +11,16 @@
   <title>幻想フォトフレーム</title>
 
   <style>
+    :root {
+      --control-bg: rgba(16, 21, 16, 0.88);
+      --accent: #78d66b;
+      --text-dark: #102010;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
     body {
       margin: 0;
       font-family: system-ui, sans-serif;
@@ -18,7 +28,7 @@
       color: white;
       text-align: center;
       overflow-x: hidden;
-      padding-bottom: 230px;
+      padding-bottom: 118px;
     }
 
     header {
@@ -38,10 +48,11 @@
 
     .camera-area {
       position: relative;
-      width: 100%;
-      max-width: 430px;
+      width: min(100vw, 430px);
+      height: min(calc(100vh - 150px), calc(min(100vw, 430px) * 16 / 9));
+      min-height: 360px;
+      max-height: 760px;
       margin: 0 auto;
-      aspect-ratio: 9 / 16;
       background: black;
       overflow: hidden;
       border-radius: 16px;
@@ -61,14 +72,29 @@
       pointer-events: none;
     }
 
+    .frame-current-badge {
+      position: absolute;
+      left: 10px;
+      top: 10px;
+      z-index: 5;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(0, 0, 0, 0.42);
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      color: white;
+      font-size: 12px;
+      line-height: 1;
+      backdrop-filter: blur(8px);
+    }
+
     .fixed-controls {
       position: fixed;
       left: 0;
       right: 0;
       bottom: 0;
       z-index: 100;
-      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-      background: rgba(16, 21, 16, 0.92);
+      padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+      background: var(--control-bg);
       backdrop-filter: blur(10px);
       box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.35);
     }
@@ -77,20 +103,14 @@
       max-width: 430px;
       margin: 0 auto;
       display: grid;
-      gap: 10px;
-    }
-
-    .frame-selector-title {
-      font-size: 12px;
-      color: #ddd;
-      text-align: left;
-      margin: 0 4px -2px;
-    }
-
-    .frame-buttons {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
       gap: 8px;
+    }
+
+    .main-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1.7fr;
+      gap: 8px;
+      align-items: center;
     }
 
     button {
@@ -98,11 +118,70 @@
       padding: 14px;
       border: none;
       border-radius: 999px;
-      background: #78d66b;
-      color: #102010;
+      background: var(--accent);
+      color: var(--text-dark);
       font-size: 17px;
       font-weight: bold;
       cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    button.small-control {
+      padding: 12px 10px;
+      background: #263326;
+      color: #f2fff2;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      font-size: 13px;
+      white-space: nowrap;
+    }
+
+    button.secondary {
+      display: none;
+      background: #ffffff;
+      color: var(--text-dark);
+      padding: 12px;
+      font-size: 15px;
+    }
+
+    .frame-panel {
+      display: none;
+      padding: 8px;
+      border-radius: 16px;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+
+    .frame-panel.open {
+      display: block;
+    }
+
+    .frame-selector-title {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #ddd;
+      text-align: left;
+      margin: 0 4px 8px;
+    }
+
+    .frame-selector-title button {
+      width: auto;
+      padding: 6px 10px;
+      font-size: 12px;
+      background: rgba(255, 255, 255, 0.92);
+      color: var(--text-dark);
+    }
+
+    .frame-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
     }
 
     button.frame-button {
@@ -115,19 +194,9 @@
     }
 
     button.frame-button.active {
-      background: #78d66b;
-      color: #102010;
+      background: var(--accent);
+      color: var(--text-dark);
       box-shadow: 0 0 12px rgba(120, 214, 107, 0.55);
-    }
-
-    button.secondary {
-      display: none;
-      background: #ffffff;
-      color: #102010;
-    }
-
-    button:active {
-      transform: scale(0.97);
     }
 
     #photoResult {
@@ -147,9 +216,30 @@
     }
 
     .status {
-      margin-top: 2px;
-      font-size: 12px;
+      margin-top: 0;
+      font-size: 11px;
       color: #bbb;
+      min-height: 1.2em;
+    }
+
+    @media (max-height: 700px) {
+      header p {
+        display: none;
+      }
+
+      h1 {
+        font-size: 18px;
+      }
+
+      .camera-area {
+        height: calc(100vh - 122px);
+        min-height: 300px;
+        border-radius: 12px;
+      }
+
+      body {
+        padding-bottom: 108px;
+      }
     }
   </style>
 </head>
@@ -157,13 +247,14 @@
 <body>
   <header>
     <h1>幻想フォトフレーム</h1>
-    <p>カメラの使用を許可して撮影してください。背面カメラを優先して起動します。</p>
+    <p>背面カメラを優先して起動します。フレーム選択は必要な時だけ開けます。</p>
   </header>
 
   <main>
     <div class="camera-area">
       <video id="video" autoplay playsinline muted></video>
       <canvas id="frameCanvas"></canvas>
+      <div class="frame-current-badge" id="currentFrameBadge">①霊夢</div>
     </div>
 
     <img id="photoResult" alt="撮影結果" />
@@ -176,12 +267,21 @@
 
   <div class="fixed-controls">
     <div class="button-area">
-      <div class="frame-selector-title">フォトフレームを選択</div>
-      <div class="frame-buttons" id="frameButtons"></div>
+      <div class="frame-panel" id="framePanel">
+        <div class="frame-selector-title">
+          <span>フォトフレームを選択</span>
+          <button type="button" onclick="toggleFramePanel(false)">閉じる</button>
+        </div>
+        <div class="frame-buttons" id="frameButtons"></div>
+      </div>
 
-      <button onclick="takePhoto()">撮影する</button>
+      <div class="main-buttons">
+        <button type="button" class="small-control" id="frameToggleButton" onclick="toggleFramePanel()">フレーム変更</button>
+        <button type="button" onclick="takePhoto()">撮影する</button>
+      </div>
+
       <button id="shareButton" class="secondary" onclick="sharePhoto()">写真を共有・保存する</button>
-      <div class="status" id="statusText">撮影ボタンはここに固定されています</div>
+      <div class="status" id="statusText">撮影しやすいよう、フレーム選択は折りたたみ式です</div>
     </div>
   </div>
 
@@ -193,6 +293,9 @@
     const shareButton = document.getElementById("shareButton");
     const statusText = document.getElementById("statusText");
     const frameButtons = document.getElementById("frameButtons");
+    const framePanel = document.getElementById("framePanel");
+    const frameToggleButton = document.getElementById("frameToggleButton");
+    const currentFrameBadge = document.getElementById("currentFrameBadge");
 
     const frames = [
       { key: "reimu", label: "①霊夢", file: "reimu.png" },
@@ -253,6 +356,26 @@
       });
     }
 
+    function getCurrentFrame() {
+      return frames.find((frame) => frame.key === currentFrameKey);
+    }
+
+    function toggleFramePanel(forceOpen) {
+      const shouldOpen = typeof forceOpen === "boolean"
+        ? forceOpen
+        : !framePanel.classList.contains("open");
+
+      framePanel.classList.toggle("open", shouldOpen);
+      frameToggleButton.textContent = shouldOpen ? "選択を閉じる" : "フレーム変更";
+
+      if (shouldOpen) {
+        statusText.textContent = "フレームを選んでください。選択後は自動で閉じます";
+      } else {
+        const currentFrame = getCurrentFrame();
+        statusText.textContent = currentFrame ? `${currentFrame.label} を選択中です` : "撮影できます";
+      }
+    }
+
     function selectFrame(frameKey) {
       const selectedFrame = frames.find((frame) => frame.key === frameKey);
       if (!selectedFrame) return;
@@ -260,6 +383,7 @@
       currentFrameKey = frameKey;
       updateFrameButtonState();
       drawFrame();
+      toggleFramePanel(false);
 
       if (frameLoadStatus[frameKey] === "loaded") {
         statusText.textContent = `${selectedFrame.label} のフレームに切り替えました`;
@@ -272,9 +396,15 @@
     }
 
     function updateFrameButtonState() {
+      const currentFrame = getCurrentFrame();
+      const currentLabel = currentFrame ? currentFrame.label : "未選択";
+
       document.querySelectorAll(".frame-button").forEach((button) => {
         button.classList.toggle("active", button.dataset.frameKey === currentFrameKey);
       });
+
+      currentFrameBadge.textContent = currentLabel;
+      frameToggleButton.textContent = framePanel.classList.contains("open") ? "選択を閉じる" : "フレーム変更";
     }
 
     async function startCamera() {
@@ -289,9 +419,21 @@
         video.srcObject = stream;
         statusText.textContent = "カメラを起動しました";
       } catch (error) {
-        statusText.textContent = "カメラを起動できませんでした";
-        alert("カメラを起動できませんでした。ブラウザのカメラ許可を確認してください。");
-        console.error(error);
+        statusText.textContent = "背面カメラを起動できなかったため、通常のカメラ起動を試します";
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: true,
+            audio: false
+          });
+
+          video.srcObject = stream;
+          statusText.textContent = "カメラを起動しました";
+        } catch (fallbackError) {
+          statusText.textContent = "カメラを起動できませんでした";
+          alert("カメラを起動できませんでした。ブラウザのカメラ許可を確認してください。");
+          console.error(fallbackError);
+        }
       }
     }
 
@@ -349,6 +491,7 @@
         photoResult.src = latestImageUrl;
         photoResult.style.display = "block";
         shareButton.style.display = "block";
+        toggleFramePanel(false);
         statusText.textContent = "撮影しました。保存する場合は共有ボタンを押してください。";
 
         photoResult.scrollIntoView({
@@ -364,7 +507,7 @@
         return;
       }
 
-      const currentFrame = frames.find((frame) => frame.key === currentFrameKey);
+      const currentFrame = getCurrentFrame();
       const fileName = currentFrame ? `photo-frame-${currentFrame.key}.png` : "photo-frame.png";
 
       const file = new File(
@@ -389,6 +532,7 @@
     }
 
     window.addEventListener("resize", resizeCanvas);
+    video.addEventListener("loadedmetadata", resizeCanvas);
 
     setupFrameButtons();
     preloadFrames();
