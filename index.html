@@ -48,10 +48,9 @@
 
     .camera-area {
       position: relative;
-      width: min(100vw, 430px);
-      height: min(calc(100vh - 150px), calc(min(100vw, 430px) * 16 / 9));
-      min-height: 360px;
-      max-height: 760px;
+      /* PNGフレームの実寸 1080×1920 と同じ 9:16 で表示します */
+      width: min(100vw, 430px, calc((100vh - 150px) * 9 / 16));
+      aspect-ratio: 9 / 16;
       margin: 0 auto;
       background: black;
       overflow: hidden;
@@ -203,6 +202,8 @@
       display: none;
       width: 92%;
       max-width: 430px;
+      aspect-ratio: 9 / 16;
+      object-fit: cover;
       margin: 14px auto;
       border-radius: 16px;
       box-shadow: 0 0 20px rgba(255,255,255,0.2);
@@ -232,8 +233,8 @@
       }
 
       .camera-area {
-        height: calc(100vh - 122px);
-        min-height: 300px;
+        width: min(100vw, 430px, calc((100vh - 122px) * 9 / 16));
+        aspect-ratio: 9 / 16;
         border-radius: 12px;
       }
 
@@ -261,6 +262,7 @@
 
     <p class="notice">
       撮影画像はサーバーに送信されません。スマホ内・ブラウザ内で処理されます。<br>
+      保存画像はフレームに合わせて 1080×1920px で出力されます。<br>
       保存できない場合は、表示された撮影結果を長押しして保存してください。
     </p>
   </main>
@@ -281,7 +283,7 @@
       </div>
 
       <button id="shareButton" class="secondary" onclick="sharePhoto()">写真を共有・保存する</button>
-      <div class="status" id="statusText">撮影しやすいよう、フレーム選択は折りたたみ式です</div>
+      <div class="status" id="statusText">1080×1920のフレームに合わせて撮影します</div>
     </div>
   </div>
 
@@ -296,6 +298,10 @@
     const framePanel = document.getElementById("framePanel");
     const frameToggleButton = document.getElementById("frameToggleButton");
     const currentFrameBadge = document.getElementById("currentFrameBadge");
+
+    // フレーム画像の実寸に合わせるため、保存画像は必ず 1080×1920 で作成します。
+    const OUTPUT_WIDTH = 1080;
+    const OUTPUT_HEIGHT = 1920;
 
     const frames = [
       { key: "reimu", label: "①霊夢", file: "reimu.png" },
@@ -438,10 +444,9 @@
     }
 
     function resizeCanvas() {
-      const rect = frameCanvas.getBoundingClientRect();
-
-      frameCanvas.width = rect.width;
-      frameCanvas.height = rect.height;
+      // 表示サイズに関係なく、Canvasの内部解像度はPNGと同じ 1080×1920 に固定します。
+      frameCanvas.width = OUTPUT_WIDTH;
+      frameCanvas.height = OUTPUT_HEIGHT;
 
       drawFrame();
     }
@@ -457,6 +462,36 @@
       ctx.drawImage(frameImages[currentFrameKey], 0, 0, w, h);
     }
 
+    function drawVideoCover(targetCtx, sourceVideo, dx, dy, dw, dh) {
+      const videoWidth = sourceVideo.videoWidth;
+      const videoHeight = sourceVideo.videoHeight;
+
+      if (!videoWidth || !videoHeight) {
+        targetCtx.fillStyle = "black";
+        targetCtx.fillRect(dx, dy, dw, dh);
+        return;
+      }
+
+      const videoRatio = videoWidth / videoHeight;
+      const outputRatio = dw / dh;
+
+      let sx = 0;
+      let sy = 0;
+      let sw = videoWidth;
+      let sh = videoHeight;
+
+      // CSSの object-fit: cover と同じ考え方で、1080×1920に合わせて中央トリミングします。
+      if (videoRatio > outputRatio) {
+        sw = videoHeight * outputRatio;
+        sx = (videoWidth - sw) / 2;
+      } else {
+        sh = videoWidth / outputRatio;
+        sy = (videoHeight - sh) / 2;
+      }
+
+      targetCtx.drawImage(sourceVideo, sx, sy, sw, sh, dx, dy, dw, dh);
+    }
+
     function takePhoto() {
       if (frameLoadStatus[currentFrameKey] !== "loaded") {
         alert("選択中のフレーム画像がまだ読み込まれていません。");
@@ -464,15 +499,15 @@
       }
 
       const outputCanvas = document.createElement("canvas");
-      const rect = frameCanvas.getBoundingClientRect();
 
-      outputCanvas.width = rect.width;
-      outputCanvas.height = rect.height;
+      // 保存画像もフレーム画像と同じ 1080×1920 で出力します。
+      outputCanvas.width = OUTPUT_WIDTH;
+      outputCanvas.height = OUTPUT_HEIGHT;
 
       const outputCtx = outputCanvas.getContext("2d");
 
-      outputCtx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
-      outputCtx.drawImage(frameCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
+      drawVideoCover(outputCtx, video, 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT);
+      outputCtx.drawImage(frameImages[currentFrameKey], 0, 0, OUTPUT_WIDTH, OUTPUT_HEIGHT);
 
       outputCanvas.toBlob((blob) => {
         if (!blob) {
