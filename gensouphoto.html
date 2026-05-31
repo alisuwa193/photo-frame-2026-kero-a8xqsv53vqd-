@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- 検索避け -->
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+  <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
+
+  <title>幻想フォトフレーム</title>
+
+  <style>
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #101510;
+      color: white;
+      text-align: center;
+      overflow-x: hidden;
+      padding-bottom: 230px;
+    }
+
+    header {
+      padding: 8px 12px 6px;
+    }
+
+    h1 {
+      margin: 4px 0;
+      font-size: 20px;
+    }
+
+    p {
+      margin: 4px 0;
+      color: #ddd;
+      font-size: 13px;
+    }
+
+    .camera-area {
+      position: relative;
+      width: 100%;
+      max-width: 430px;
+      margin: 0 auto;
+      aspect-ratio: 9 / 16;
+      background: black;
+      overflow: hidden;
+      border-radius: 16px;
+      box-shadow: 0 0 24px rgba(120, 220, 120, 0.35);
+    }
+
+    video,
+    canvas {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    #frameCanvas {
+      pointer-events: none;
+    }
+
+    .fixed-controls {
+      position: fixed;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 100;
+      padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+      background: rgba(16, 21, 16, 0.92);
+      backdrop-filter: blur(10px);
+      box-shadow: 0 -4px 18px rgba(0, 0, 0, 0.35);
+    }
+
+    .button-area {
+      max-width: 430px;
+      margin: 0 auto;
+      display: grid;
+      gap: 10px;
+    }
+
+    .frame-selector-title {
+      font-size: 12px;
+      color: #ddd;
+      text-align: left;
+      margin: 0 4px -2px;
+    }
+
+    .frame-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
+    button {
+      width: 100%;
+      padding: 14px;
+      border: none;
+      border-radius: 999px;
+      background: #78d66b;
+      color: #102010;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button.frame-button {
+      padding: 10px 6px;
+      background: #243024;
+      color: #f2fff2;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    button.frame-button.active {
+      background: #78d66b;
+      color: #102010;
+      box-shadow: 0 0 12px rgba(120, 214, 107, 0.55);
+    }
+
+    button.secondary {
+      display: none;
+      background: #ffffff;
+      color: #102010;
+    }
+
+    button:active {
+      transform: scale(0.97);
+    }
+
+    #photoResult {
+      display: none;
+      width: 92%;
+      max-width: 430px;
+      margin: 14px auto;
+      border-radius: 16px;
+      box-shadow: 0 0 20px rgba(255,255,255,0.2);
+    }
+
+    .notice {
+      padding: 10px 20px 24px;
+      font-size: 12px;
+      color: #aaa;
+      line-height: 1.6;
+    }
+
+    .status {
+      margin-top: 2px;
+      font-size: 12px;
+      color: #bbb;
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>幻想フォトフレーム</h1>
+    <p>カメラの使用を許可して撮影してください。背面カメラを優先して起動します。</p>
+  </header>
+
+  <main>
+    <div class="camera-area">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="frameCanvas"></canvas>
+    </div>
+
+    <img id="photoResult" alt="撮影結果" />
+
+    <p class="notice">
+      撮影画像はサーバーに送信されません。スマホ内・ブラウザ内で処理されます。<br>
+      保存できない場合は、表示された撮影結果を長押しして保存してください。
+    </p>
+  </main>
+
+  <div class="fixed-controls">
+    <div class="button-area">
+      <div class="frame-selector-title">フォトフレームを選択</div>
+      <div class="frame-buttons" id="frameButtons"></div>
+
+      <button onclick="takePhoto()">撮影する</button>
+      <button id="shareButton" class="secondary" onclick="sharePhoto()">写真を共有・保存する</button>
+      <div class="status" id="statusText">撮影ボタンはここに固定されています</div>
+    </div>
+  </div>
+
+  <script>
+    const video = document.getElementById("video");
+    const frameCanvas = document.getElementById("frameCanvas");
+    const ctx = frameCanvas.getContext("2d");
+    const photoResult = document.getElementById("photoResult");
+    const shareButton = document.getElementById("shareButton");
+    const statusText = document.getElementById("statusText");
+    const frameButtons = document.getElementById("frameButtons");
+
+    const frames = [
+      { key: "reimu", label: "①霊夢", file: "reimu.png" },
+      { key: "marisa", label: "②魔理沙", file: "marisa.png" },
+      { key: "sakuya", label: "③咲夜", file: "sakuya.png" },
+      { key: "sanae", label: "④早苗", file: "sanae.png" },
+      { key: "suwako", label: "⑤諏訪子", file: "suwako.png" },
+      { key: "murasa", label: "⑥ムラサ", file: "murasa.png" }
+    ];
+
+    const frameImages = {};
+    const frameLoadStatus = {};
+
+    let currentFrameKey = frames[0].key;
+    let latestImageBlob = null;
+    let latestImageUrl = null;
+
+    function setupFrameButtons() {
+      frames.forEach((frame) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "frame-button";
+        button.textContent = frame.label;
+        button.dataset.frameKey = frame.key;
+        button.onclick = () => selectFrame(frame.key);
+        frameButtons.appendChild(button);
+      });
+
+      updateFrameButtonState();
+    }
+
+    function preloadFrames() {
+      frames.forEach((frame) => {
+        const image = new Image();
+        frameImages[frame.key] = image;
+        frameLoadStatus[frame.key] = "loading";
+
+        image.onload = () => {
+          frameLoadStatus[frame.key] = "loaded";
+
+          if (frame.key === currentFrameKey) {
+            drawFrame();
+            statusText.textContent = `${frame.label} のフレームを読み込みました`;
+          }
+        };
+
+        image.onerror = () => {
+          frameLoadStatus[frame.key] = "error";
+
+          if (frame.key === currentFrameKey) {
+            drawFrame();
+            statusText.textContent = `${frame.file} を読み込めませんでした`;
+            alert(`フレーム画像を読み込めませんでした。${frame.file} を index.html と同じフォルダに置いてください。`);
+          }
+        };
+
+        image.src = frame.file;
+      });
+    }
+
+    function selectFrame(frameKey) {
+      const selectedFrame = frames.find((frame) => frame.key === frameKey);
+      if (!selectedFrame) return;
+
+      currentFrameKey = frameKey;
+      updateFrameButtonState();
+      drawFrame();
+
+      if (frameLoadStatus[frameKey] === "loaded") {
+        statusText.textContent = `${selectedFrame.label} のフレームに切り替えました`;
+      } else if (frameLoadStatus[frameKey] === "loading") {
+        statusText.textContent = `${selectedFrame.label} のフレームを読み込み中です`;
+      } else {
+        statusText.textContent = `${selectedFrame.file} を読み込めませんでした`;
+        alert(`フレーム画像を読み込めませんでした。${selectedFrame.file} を index.html と同じフォルダに置いてください。`);
+      }
+    }
+
+    function updateFrameButtonState() {
+      document.querySelectorAll(".frame-button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.frameKey === currentFrameKey);
+      });
+    }
+
+    async function startCamera() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: "environment" }
+          },
+          audio: false
+        });
+
+        video.srcObject = stream;
+        statusText.textContent = "カメラを起動しました";
+      } catch (error) {
+        statusText.textContent = "カメラを起動できませんでした";
+        alert("カメラを起動できませんでした。ブラウザのカメラ許可を確認してください。");
+        console.error(error);
+      }
+    }
+
+    function resizeCanvas() {
+      const rect = frameCanvas.getBoundingClientRect();
+
+      frameCanvas.width = rect.width;
+      frameCanvas.height = rect.height;
+
+      drawFrame();
+    }
+
+    function drawFrame() {
+      const w = frameCanvas.width;
+      const h = frameCanvas.height;
+
+      ctx.clearRect(0, 0, w, h);
+
+      if (frameLoadStatus[currentFrameKey] !== "loaded") return;
+
+      ctx.drawImage(frameImages[currentFrameKey], 0, 0, w, h);
+    }
+
+    function takePhoto() {
+      if (frameLoadStatus[currentFrameKey] !== "loaded") {
+        alert("選択中のフレーム画像がまだ読み込まれていません。");
+        return;
+      }
+
+      const outputCanvas = document.createElement("canvas");
+      const rect = frameCanvas.getBoundingClientRect();
+
+      outputCanvas.width = rect.width;
+      outputCanvas.height = rect.height;
+
+      const outputCtx = outputCanvas.getContext("2d");
+
+      outputCtx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
+      outputCtx.drawImage(frameCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
+
+      outputCanvas.toBlob((blob) => {
+        if (!blob) {
+          alert("画像の作成に失敗しました。");
+          return;
+        }
+
+        latestImageBlob = blob;
+
+        if (latestImageUrl) {
+          URL.revokeObjectURL(latestImageUrl);
+        }
+
+        latestImageUrl = URL.createObjectURL(blob);
+
+        photoResult.src = latestImageUrl;
+        photoResult.style.display = "block";
+        shareButton.style.display = "block";
+        statusText.textContent = "撮影しました。保存する場合は共有ボタンを押してください。";
+
+        photoResult.scrollIntoView({
+          behavior: "smooth",
+          block: "center"
+        });
+      }, "image/png");
+    }
+
+    async function sharePhoto() {
+      if (!latestImageBlob) {
+        alert("先に撮影してください。");
+        return;
+      }
+
+      const currentFrame = frames.find((frame) => frame.key === currentFrameKey);
+      const fileName = currentFrame ? `photo-frame-${currentFrame.key}.png` : "photo-frame.png";
+
+      const file = new File(
+        [latestImageBlob],
+        fileName,
+        { type: "image/png" }
+      );
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: "幻想フォトフレーム",
+            text: "撮影した写真です"
+          });
+        } catch (error) {
+          console.log("共有がキャンセルされたか、失敗しました。", error);
+        }
+      } else {
+        alert("このブラウザでは共有保存に対応していません。表示された画像を長押しして保存してください。");
+      }
+    }
+
+    window.addEventListener("resize", resizeCanvas);
+
+    setupFrameButtons();
+    preloadFrames();
+    startCamera();
+
+    setTimeout(() => {
+      resizeCanvas();
+    }, 500);
+  </script>
+</body>
+</html>
