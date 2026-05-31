@@ -18,7 +18,7 @@
       color: white;
       text-align: center;
       overflow-x: hidden;
-      padding-bottom: 150px;
+      padding-bottom: 230px;
     }
 
     header {
@@ -57,16 +57,6 @@
       object-fit: cover;
     }
 
-    /*
-      撮影中の画面だけ左右反転します。
-      カメラ映像とフレームの両方を鏡のように表示します。
-      保存時にはこのCSS反転は反映されません。
-    */
-    #video,
-    #frameCanvas {
-      transform: scaleX(-1);
-    }
-
     #frameCanvas {
       pointer-events: none;
     }
@@ -90,6 +80,19 @@
       gap: 10px;
     }
 
+    .frame-selector-title {
+      font-size: 12px;
+      color: #ddd;
+      text-align: left;
+      margin: 0 4px -2px;
+    }
+
+    .frame-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+    }
+
     button {
       width: 100%;
       padding: 14px;
@@ -100,6 +103,21 @@
       font-size: 17px;
       font-weight: bold;
       cursor: pointer;
+    }
+
+    button.frame-button {
+      padding: 10px 6px;
+      background: #243024;
+      color: #f2fff2;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    button.frame-button.active {
+      background: #78d66b;
+      color: #102010;
+      box-shadow: 0 0 12px rgba(120, 214, 107, 0.55);
     }
 
     button.secondary {
@@ -129,7 +147,7 @@
     }
 
     .status {
-      margin-top: 6px;
+      margin-top: 2px;
       font-size: 12px;
       color: #bbb;
     }
@@ -139,7 +157,7 @@
 <body>
   <header>
     <h1>幻想フォトフレーム</h1>
-    <p>カメラの使用を許可して撮影してください</p>
+    <p>カメラの使用を許可して撮影してください。背面カメラを優先して起動します。</p>
   </header>
 
   <main>
@@ -158,6 +176,9 @@
 
   <div class="fixed-controls">
     <div class="button-area">
+      <div class="frame-selector-title">フォトフレームを選択</div>
+      <div class="frame-buttons" id="frameButtons"></div>
+
       <button onclick="takePhoto()">撮影する</button>
       <button id="shareButton" class="secondary" onclick="sharePhoto()">写真を共有・保存する</button>
       <div class="status" id="statusText">撮影ボタンはここに固定されています</div>
@@ -171,30 +192,96 @@
     const photoResult = document.getElementById("photoResult");
     const shareButton = document.getElementById("shareButton");
     const statusText = document.getElementById("statusText");
+    const frameButtons = document.getElementById("frameButtons");
 
-    const frameImage = new Image();
-    frameImage.src = "suwako.png";
+    const frames = [
+      { key: "reimu", label: "①霊夢", file: "reimu.png" },
+      { key: "marisa", label: "②魔理沙", file: "marisa.png" },
+      { key: "sakuya", label: "③咲夜", file: "sakuya.png" },
+      { key: "sanae", label: "④早苗", file: "sanae.png" },
+      { key: "suwako", label: "⑤諏訪子", file: "suwako.png" },
+      { key: "murasa", label: "⑥ムラサ", file: "murasa.png" }
+    ];
 
-    let imageLoaded = false;
+    const frameImages = {};
+    const frameLoadStatus = {};
+
+    let currentFrameKey = frames[0].key;
     let latestImageBlob = null;
     let latestImageUrl = null;
 
-    frameImage.onload = () => {
-      imageLoaded = true;
-      drawFrame();
-      statusText.textContent = "フレーム画像を読み込みました";
-    };
+    function setupFrameButtons() {
+      frames.forEach((frame) => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "frame-button";
+        button.textContent = frame.label;
+        button.dataset.frameKey = frame.key;
+        button.onclick = () => selectFrame(frame.key);
+        frameButtons.appendChild(button);
+      });
 
-    frameImage.onerror = () => {
-      statusText.textContent = "suwako.png を読み込めませんでした";
-      alert("フレーム画像を読み込めませんでした。suwako.png を index.html と同じフォルダに置いてください。");
-    };
+      updateFrameButtonState();
+    }
+
+    function preloadFrames() {
+      frames.forEach((frame) => {
+        const image = new Image();
+        frameImages[frame.key] = image;
+        frameLoadStatus[frame.key] = "loading";
+
+        image.onload = () => {
+          frameLoadStatus[frame.key] = "loaded";
+
+          if (frame.key === currentFrameKey) {
+            drawFrame();
+            statusText.textContent = `${frame.label} のフレームを読み込みました`;
+          }
+        };
+
+        image.onerror = () => {
+          frameLoadStatus[frame.key] = "error";
+
+          if (frame.key === currentFrameKey) {
+            drawFrame();
+            statusText.textContent = `${frame.file} を読み込めませんでした`;
+            alert(`フレーム画像を読み込めませんでした。${frame.file} を index.html と同じフォルダに置いてください。`);
+          }
+        };
+
+        image.src = frame.file;
+      });
+    }
+
+    function selectFrame(frameKey) {
+      const selectedFrame = frames.find((frame) => frame.key === frameKey);
+      if (!selectedFrame) return;
+
+      currentFrameKey = frameKey;
+      updateFrameButtonState();
+      drawFrame();
+
+      if (frameLoadStatus[frameKey] === "loaded") {
+        statusText.textContent = `${selectedFrame.label} のフレームに切り替えました`;
+      } else if (frameLoadStatus[frameKey] === "loading") {
+        statusText.textContent = `${selectedFrame.label} のフレームを読み込み中です`;
+      } else {
+        statusText.textContent = `${selectedFrame.file} を読み込めませんでした`;
+        alert(`フレーム画像を読み込めませんでした。${selectedFrame.file} を index.html と同じフォルダに置いてください。`);
+      }
+    }
+
+    function updateFrameButtonState() {
+      document.querySelectorAll(".frame-button").forEach((button) => {
+        button.classList.toggle("active", button.dataset.frameKey === currentFrameKey);
+      });
+    }
 
     async function startCamera() {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: "user"
+            facingMode: { ideal: "environment" }
           },
           audio: false
         });
@@ -223,16 +310,17 @@
 
       ctx.clearRect(0, 0, w, h);
 
-      if (!imageLoaded) return;
+      if (frameLoadStatus[currentFrameKey] !== "loaded") return;
 
-      /*
-        Canvas内部には通常向きで描画します。
-        表示上だけCSSで左右反転されます。
-      */
-      ctx.drawImage(frameImage, 0, 0, w, h);
+      ctx.drawImage(frameImages[currentFrameKey], 0, 0, w, h);
     }
 
     function takePhoto() {
+      if (frameLoadStatus[currentFrameKey] !== "loaded") {
+        alert("選択中のフレーム画像がまだ読み込まれていません。");
+        return;
+      }
+
       const outputCanvas = document.createElement("canvas");
       const rect = frameCanvas.getBoundingClientRect();
 
@@ -241,17 +329,7 @@
 
       const outputCtx = outputCanvas.getContext("2d");
 
-      /*
-        保存時は左右反転させません。
-        CSSの transform は画面表示だけに効くため、
-        drawImage では元のカメラ映像がそのまま描画されます。
-      */
       outputCtx.drawImage(video, 0, 0, outputCanvas.width, outputCanvas.height);
-
-      /*
-        フレームも保存時は反転させません。
-        frameCanvas内部には通常向きで描かれているため、そのまま保存されます。
-      */
       outputCtx.drawImage(frameCanvas, 0, 0, outputCanvas.width, outputCanvas.height);
 
       outputCanvas.toBlob((blob) => {
@@ -286,9 +364,12 @@
         return;
       }
 
+      const currentFrame = frames.find((frame) => frame.key === currentFrameKey);
+      const fileName = currentFrame ? `photo-frame-${currentFrame.key}.png` : "photo-frame.png";
+
       const file = new File(
         [latestImageBlob],
-        "photo-frame.png",
+        fileName,
         { type: "image/png" }
       );
 
@@ -309,6 +390,8 @@
 
     window.addEventListener("resize", resizeCanvas);
 
+    setupFrameButtons();
+    preloadFrames();
     startCamera();
 
     setTimeout(() => {
